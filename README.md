@@ -14,8 +14,6 @@ https://invoice-generator-react.netlify.app/
 ### Installation
 
 ```
-
-
 npm install
 
 npm start / npm run build
@@ -32,6 +30,7 @@ npm start / npm run build
 
 
 ### Meta
+
 
 
 
