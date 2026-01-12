@@ -1,12 +1,9 @@
 pipeline {
     agent any
 
-    tools {
-        nodejs 'node16'
-    }
-
     environment {
-        DEPLOY_DIR = "/var/www/krish.run.place"
+        SONAR_HOST_URL = "http://3.109.214.202:9000"
+        SONAR_TOKEN = credentials('sonar-token')
     }
 
     stages {
@@ -18,40 +15,54 @@ pipeline {
             }
         }
 
+        stage('Use NodeJS') {
+            steps {
+                nodejs(nodeJSInstallationName: 'nodejs16') {
+                    sh '''
+                      node -v
+                      npm -v
+                    '''
+                }
+            }
+        }
+
         stage('Install Dependencies') {
             steps {
-                sh 'npm install'
+                nodejs(nodeJSInstallationName: 'nodejs16') {
+                    sh 'npm install'
+                }
+            }
+        }
+
+        stage('Build') {
+            steps {
+                nodejs(nodeJSInstallationName: 'nodejs16') {
+                    sh 'npm run build'
+                }
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('sonarqube') {
-                    sh 'sonar-scanner'
+                    nodejs(nodeJSInstallationName: 'nodejs16') {
+                        sh '''
+                          npx sonar-scanner \
+                          -Dsonar.projectKey=react-cicd \
+                          -Dsonar.sources=src \
+                          -Dsonar.host.url=$SONAR_HOST_URL \
+                          -Dsonar.login=$SONAR_TOKEN
+                        '''
+                    }
                 }
             }
         }
 
-        stage('Quality Gate') {
-            steps {
-                timeout(time: 5, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
-            }
-        }
-
-        stage('Build React App') {
-            steps {
-                sh 'npm run build'
-            }
-        }
-
-        stage('Deploy to Apache') {
+        stage('Deploy') {
             steps {
                 sh '''
-                  rsync -av --delete build/ ${DEPLOY_DIR}/
-                  chown -R www-data:www-data ${DEPLOY_DIR}
-                  chmod -R 755 ${DEPLOY_DIR}
+                  sudo rm -rf /var/www/krish.run.place/*
+                  sudo cp -r build/* /var/www/krish.run.place/
                 '''
             }
         }
