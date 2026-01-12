@@ -2,11 +2,13 @@ pipeline {
     agent any
 
     tools {
-        nodejs 'nodejs16'
+        nodejs 'nodejs16'   // MUST match Jenkins → Manage Tools
     }
 
     environment {
-        SONAR_TOKEN = credentials('sonar-token')
+        SONAR_PROJECT_KEY = 'react-cicd'
+        SONAR_PROJECT_NAME = 'react-cicd'
+        DEPLOY_DIR = '/var/www/html/react-app'
     }
 
     stages {
@@ -30,9 +32,7 @@ pipeline {
 
         stage('Build React App') {
             steps {
-                sh '''
-                  npm run build
-                '''
+                sh 'npm run build'
             }
         }
 
@@ -41,11 +41,12 @@ pipeline {
                 withSonarQubeEnv('sonarqube') {
                     sh '''
                       npx sonar-scanner \
-                        -Dsonar.projectKey=react-cicd \
-                        -Dsonar.projectName=react-cicd \
+                        -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                        -Dsonar.projectName=${SONAR_PROJECT_NAME} \
                         -Dsonar.sources=src \
+                        -Dsonar.exclusions=node_modules/**,build/** \
                         -Dsonar.host.url=http://3.109.214.202:9000 \
-                        -Dsonar.login=$SONAR_TOKEN
+                        -Dsonar.token=$SONAR_TOKEN
                     '''
                 }
             }
@@ -53,7 +54,7 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                timeout(time: 5, unit: 'MINUTES') {
+                timeout(time: 15, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
@@ -62,9 +63,10 @@ pipeline {
         stage('Deploy to Apache') {
             steps {
                 sh '''
-                  sudo rm -rf /var/www/krish.run.place/*
-                  sudo cp -r build/* /var/www/krish.run.place/
-                  sudo chown -R www-data:www-data /var/www/krish.run.place
+                  sudo rm -rf ${DEPLOY_DIR}
+                  sudo mkdir -p ${DEPLOY_DIR}
+                  sudo cp -r build/* ${DEPLOY_DIR}/
+                  sudo chown -R www-data:www-data ${DEPLOY_DIR}
                 '''
             }
         }
@@ -72,11 +74,13 @@ pipeline {
 
     post {
         success {
-            echo "✅ Deployment successful!"
+            echo '✅ CI/CD Pipeline completed successfully!'
         }
-
         failure {
-            echo "❌ Pipeline failed. Check logs."
+            echo '❌ Pipeline failed. Check logs.'
+        }
+        aborted {
+            echo '⚠️ Pipeline aborted (timeout or manual stop).'
         }
     }
 }
