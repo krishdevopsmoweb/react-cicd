@@ -6,7 +6,8 @@ pipeline {
     }
 
     environment {
-        DEPLOY_DIR = '/var/www/krish.run.place'
+        PROJECT_DIR = '/var/www/html/react-cicd'
+        BUILD_DIR   = '/var/www/html/react-cicd/build'
     }
 
     stages {
@@ -57,16 +58,16 @@ pipeline {
             }
         }
 
-        stage('Deploy to Apache') {
+        stage('Deploy (Build → Apache)') {
             steps {
                 sh '''
-                  echo "Deploying to ${DEPLOY_DIR}"
+                  echo "Deploying React build"
 
-                  rm -rf ${DEPLOY_DIR}/*
-                  cp -r build/* ${DEPLOY_DIR}/
+                  rm -rf ${BUILD_DIR}
+                  cp -r build ${PROJECT_DIR}/
 
-                  chown -R jenkins:www-data ${DEPLOY_DIR}
-                  chmod -R 755 ${DEPLOY_DIR}
+                  chown -R root:root ${PROJECT_DIR}
+                  chmod -R 755 ${PROJECT_DIR}
                 '''
             }
         }
@@ -74,10 +75,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ React app deployed successfully to krish.run.place'
+            echo '✅ React app deployed successfully'
         }
         failure {
-            echo '❌ Pipeline failed. Check logs.'
+            echo '❌ Pipeline failed'
         }
     }
 }
