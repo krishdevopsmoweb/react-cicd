@@ -1,70 +1,82 @@
 pipeline {
     agent any
 
+    tools {
+        nodejs 'nodejs18'
+    }
+
     environment {
-        SONAR_HOST_URL = "http://3.109.214.202:9000"
         SONAR_TOKEN = credentials('sonar-token')
     }
 
     stages {
 
-        stage('Checkout') {
+        stage('Checkout Code') {
             steps {
                 git branch: 'main',
                     url: 'https://github.com/krishdevopsmoweb/react-cicd.git'
             }
         }
 
-        stage('Use NodeJS') {
-            steps {
-                nodejs(nodeJSInstallationName: 'nodejs16') {
-                    sh '''
-                      node -v
-                      npm -v
-                    '''
-                }
-            }
-        }
-
         stage('Install Dependencies') {
             steps {
-                nodejs(nodeJSInstallationName: 'nodejs16') {
-                    sh 'npm install'
-                }
+                sh '''
+                  node -v
+                  npm -v
+                  npm install
+                '''
             }
         }
 
-        stage('Build') {
+        stage('Build React App') {
             steps {
-                nodejs(nodeJSInstallationName: 'nodejs16') {
-                    sh 'npm run build'
-                }
+                sh '''
+                  npm run build
+                '''
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('sonarqube') {
-                    nodejs(nodeJSInstallationName: 'nodejs16') {
-                        sh '''
-                          npx sonar-scanner \
-                          -Dsonar.projectKey=react-cicd \
-                          -Dsonar.sources=src \
-                          -Dsonar.host.url=$SONAR_HOST_URL \
-                          -Dsonar.login=$SONAR_TOKEN
-                        '''
-                    }
+                    sh '''
+                      npx sonar-scanner \
+                        -Dsonar.projectKey=react-cicd \
+                        -Dsonar.projectName=react-cicd \
+                        -Dsonar.sources=src \
+                        -Dsonar.host.url=http://3.109.214.202:9000 \
+                        -Dsonar.login=$SONAR_TOKEN
+                    '''
                 }
             }
         }
 
-        stage('Deploy') {
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        stage('Deploy to Apache') {
             steps {
                 sh '''
                   sudo rm -rf /var/www/krish.run.place/*
                   sudo cp -r build/* /var/www/krish.run.place/
+                  sudo chown -R www-data:www-data /var/www/krish.run.place
                 '''
             }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Deployment successful!"
+        }
+
+        failure {
+            echo "❌ Pipeline failed. Check logs."
         }
     }
 }
