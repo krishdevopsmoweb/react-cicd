@@ -5,14 +5,9 @@ pipeline {
         nodejs 'nodejs16'
     }
 
-    environment {
-        PROJECT_DIR = '/var/www/html/react-cicd'
-        BUILD_DIR   = '/var/www/html/react-cicd/build'
-    }
-
     stages {
 
-        stage('Checkout SCM') {
+        stage('Checkout Code') {
             steps {
                 checkout scm
             }
@@ -21,6 +16,7 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 sh '''
+                  cd /var/www/html/react-cicd
                   node -v
                   npm -v
                   npm install
@@ -31,6 +27,7 @@ pipeline {
         stage('Build React App') {
             steps {
                 sh '''
+                  cd /var/www/html/react-cicd
                   npm run build
                 '''
             }
@@ -40,11 +37,8 @@ pipeline {
             steps {
                 withSonarQubeEnv('sonarqube') {
                     sh '''
-                      npx sonar-scanner \
-                        -Dsonar.projectKey=react-cicd \
-                        -Dsonar.projectName=react-cicd \
-                        -Dsonar.sources=src \
-                        -Dsonar.exclusions=node_modules/**,build/**
+                      cd /var/www/html/react-cicd
+                      npx sonar-scanner
                     '''
                 }
             }
@@ -52,22 +46,20 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                timeout(time: 10, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
+                echo "Waiting for SonarQube Quality Gate..."
+                waitForQualityGate abortPipeline: true
             }
         }
 
         stage('Deploy (Build → Apache)') {
             steps {
                 sh '''
-                  echo "Deploying React build"
+                  echo "Deploying React build to Apache DocumentRoot"
+                  cd /var/www/html/react-cicd
 
-                  rm -rf ${BUILD_DIR}
-                  cp -r build ${PROJECT_DIR}/
+                  rm -rf public static asset-manifest.json favicon.ico index.html manifest.json robots.txt
 
-                  chown -R root:root ${PROJECT_DIR}
-                  chmod -R 755 ${PROJECT_DIR}
+                  cp -r build/* .
                 '''
             }
         }
@@ -75,10 +67,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ React app deployed successfully'
+            echo "✅ SUCCESS: Build passed Quality Gate and deployed"
         }
         failure {
-            echo '❌ Pipeline failed'
+            echo "❌ FAILURE: Quality Gate failed or build error"
         }
     }
 }
