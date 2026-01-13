@@ -2,24 +2,19 @@ pipeline {
     agent any
 
     environment {
-        // Fix OpenSSL issue for webpack/react-scripts
         NODE_OPTIONS = "--openssl-legacy-provider"
-
-        // Project details
         PROJECT_NAME = "react-cicd"
         DEPLOY_DIR   = "/var/www/html/react-app"
-
-        // SonarQube
-        SONAR_PROJECT_KEY = "react-cicd"
-        SONAR_HOST_URL    = "http://3.109.214.202:9000"
-        SONAR_TOKEN       = credentials('sonar-token')
-
-        // Email
         DEVOPS_EMAIL = "krish.devopsmoweb@gmail.com"
     }
 
     triggers {
         githubPush()
+    }
+
+    tools {
+        nodejs "NodeJS-20"
+        sonarScanner "SonarScanner"
     }
 
     stages {
@@ -42,21 +37,19 @@ pipeline {
 
         stage('Build React App') {
             steps {
-                sh '''
-                    npm run build
-                '''
+                sh 'npm run build'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                sh """
-                    sonar-scanner \
-                    -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                    -Dsonar.sources=src \
-                    -Dsonar.host.url=${SONAR_HOST_URL} \
-                    -Dsonar.login=${SONAR_TOKEN}
-                """
+                withSonarQubeEnv('SonarQube') {
+                    sh '''
+                        sonar-scanner \
+                        -Dsonar.projectKey=react-cicd \
+                        -Dsonar.sources=src
+                    '''
+                }
             }
         }
 
@@ -74,25 +67,20 @@ pipeline {
         stage('Approval Before Deploy') {
             steps {
                 emailext(
-                    subject: "🚀 Approval Required: Deploy ${PROJECT_NAME}",
+                    subject: "🚀 Approval Required: Deploy react-cicd",
                     to: "${DEVOPS_EMAIL}",
                     body: """
-Build SUCCESS and Quality Gate PASSED ✅
+Build SUCCESS & Quality Gate PASSED ✅
 
-Project: ${PROJECT_NAME}
-Job: ${env.JOB_NAME}
-Build: #${env.BUILD_NUMBER}
-
-👉 Please approve deployment in Jenkins:
+Approve deployment:
 ${env.BUILD_URL}input
 """
                 )
-
-                input message: 'Do you want to deploy to PRODUCTION?', ok: 'Deploy'
+                input message: 'Deploy to Production?', ok: 'Deploy'
             }
         }
 
-        stage('Deploy to Apache') {
+        stage('Deploy') {
             steps {
                 sh '''
                     sudo rm -rf ${DEPLOY_DIR}
@@ -105,37 +93,20 @@ ${env.BUILD_URL}input
     }
 
     post {
-
         success {
             emailext(
-                subject: "✅ Deployment SUCCESS: ${PROJECT_NAME}",
+                subject: "✅ Deployment SUCCESS: react-cicd",
                 to: "${DEVOPS_EMAIL}",
-                body: """
-Deployment completed successfully 🎉
-
-Project: ${PROJECT_NAME}
-Build: #${env.BUILD_NUMBER}
-
-Live on server.
-"""
+                body: "Deployment completed successfully."
             )
         }
 
         failure {
             emailext(
-                subject: "❌ Pipeline FAILED: ${PROJECT_NAME}",
+                subject: "❌ Pipeline FAILED: react-cicd",
                 to: "${DEVOPS_EMAIL}",
-                body: """
-Pipeline FAILED ❌
-
-Project: ${PROJECT_NAME}
-Build: #${env.BUILD_NUMBER}
-
-Check logs:
-${env.BUILD_URL}
-"""
+                body: "Check Jenkins logs: ${env.BUILD_URL}"
             )
         }
     }
 }
-
