@@ -14,7 +14,6 @@ pipeline {
 
     tools {
         nodejs "nodejs16"
-        sonarRunner "SonarScanner"
     }
 
     stages {
@@ -110,4 +109,3 @@ ${env.BUILD_URL}input
         }
     }
 }
-
