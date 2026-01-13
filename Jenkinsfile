@@ -13,8 +13,8 @@ pipeline {
     }
 
     tools {
-        nodejs "NodeJS-20"
-        sonarScanner "SonarScanner"
+        nodejs "nodejs16"
+        sonarRunner "SonarScanner"
     }
 
     stages {
@@ -72,7 +72,7 @@ pipeline {
                     body: """
 Build SUCCESS & Quality Gate PASSED ✅
 
-Approve deployment:
+Click below to approve deployment:
 ${env.BUILD_URL}input
 """
                 )
@@ -110,3 +110,4 @@ ${env.BUILD_URL}input
         }
     }
 }
+
