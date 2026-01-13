@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     environment {
-        NODE_OPTIONS = "--openssl-legacy-provider"
         PROJECT_NAME = "react-cicd"
         DEPLOY_DIR   = "/var/www/html/react-app"
         DEVOPS_EMAIL = "krish.devopsmoweb@gmail.com"
@@ -35,6 +34,9 @@ pipeline {
         }
 
         stage('Build React App') {
+            environment {
+                NODE_OPTIONS = "--openssl-legacy-provider"
+            }
             steps {
                 sh 'npm run build'
             }
@@ -71,7 +73,7 @@ pipeline {
                     body: """
 Build SUCCESS & Quality Gate PASSED ✅
 
-Click below to approve deployment:
+Approve deployment:
 ${env.BUILD_URL}input
 """
                 )
@@ -104,8 +106,9 @@ ${env.BUILD_URL}input
             emailext(
                 subject: "❌ Pipeline FAILED: react-cicd",
                 to: "${DEVOPS_EMAIL}",
-                body: "Check Jenkins logs: ${env.BUILD_URL}"
+                body: "Check logs: ${env.BUILD_URL}"
             )
         }
     }
 }
+
