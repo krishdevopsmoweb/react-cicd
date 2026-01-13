@@ -1,24 +1,23 @@
 pipeline {
     agent any
 
-    tools {
-        nodejs 'nodejs16'
+    environment {
+        DEPLOY_PATH = "/var/www/html/react-app"
     }
 
     stages {
 
-        stage('Checkout Code') {
+        stage('Checkout') {
             steps {
-                checkout scm
+                git branch: 'main',
+                    url: 'https://github.com/krishdevopsmoweb/react-cicd.git'
             }
         }
 
         stage('Install Dependencies') {
             steps {
                 sh '''
-                  cd /var/www/html/react-cicd
                   node -v
-                  npm -v
                   npm install
                 '''
             }
@@ -26,19 +25,17 @@ pipeline {
 
         stage('Build React App') {
             steps {
-                sh '''
-                  cd /var/www/html/react-cicd
-                  npm run build
-                '''
+                sh 'npm run build'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('sonarqube') {
+                withSonarQubeEnv('SonarQube') {
                     sh '''
-                      cd /var/www/html/react-cicd
-                      npx sonar-scanner
+                      sonar-scanner \
+                      -Dsonar.projectKey=react-cicd \
+                      -Dsonar.sources=src
                     '''
                 }
             }
@@ -46,20 +43,33 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                echo "Waiting for SonarQube Quality Gate..."
                 waitForQualityGate abortPipeline: true
             }
         }
 
-        stage('Deploy (Build → Apache)') {
+        stage('Approval Before Deploy') {
+            steps {
+                emailext(
+                    to: 'krish.devopsmoweb@gmail.com',
+                    subject: "Approval Needed: React App Deployment",
+                    body: """
+                    <h3>Deployment Approval Required</h3>
+                    <p>Project: React CI/CD</p>
+                    <p>Build Number: ${BUILD_NUMBER}</p>
+                    <p><b>Click Jenkins and approve deployment.</b></p>
+                    """
+                )
+
+                input message: 'Do you want to deploy to production?',
+                      ok: 'Deploy Now'
+            }
+        }
+
+        stage('Deploy') {
             steps {
                 sh '''
-                  echo "Deploying React build to Apache DocumentRoot"
-                  cd /var/www/html/react-cicd
-
-                  rm -rf public static asset-manifest.json favicon.ico index.html manifest.json robots.txt
-
-                  cp -r build/* .
+                  rm -rf ${DEPLOY_PATH}/*
+                  cp -r build/* ${DEPLOY_PATH}/
                 '''
             }
         }
@@ -67,10 +77,19 @@ pipeline {
 
     post {
         success {
-            echo "✅ SUCCESS: Build passed Quality Gate and deployed"
+            emailext(
+                to: 'krish.devopsmoweb@gmail.com',
+                subject: "✅ Deployment Successful - Build #${BUILD_NUMBER}",
+                body: "React app deployed successfully."
+            )
         }
+
         failure {
-            echo "❌ FAILURE: Quality Gate failed or build error"
+            emailext(
+                to: 'krish.devopsmoweb@gmail.com',
+                subject: "❌ Pipeline Failed - Build #${BUILD_NUMBER}",
+                body: "Pipeline failed. Please check Jenkins logs."
+            )
         }
     }
 }
