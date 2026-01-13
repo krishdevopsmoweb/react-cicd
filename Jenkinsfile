@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         PROJECT_NAME = "react-cicd"
+        // This is the parent directory. Apache is looking for the 'build' folder inside this.
         DEPLOY_DIR   = "/var/www/html/react-cicd"
         DEVOPS_EMAIL = "krish.devopsmoweb@gmail.com"
     }
@@ -43,6 +44,7 @@ pipeline {
 
         stage('SonarQube analysis') {
             steps {
+                // Matches your 'sonarqube' lowercase name in Jenkins settings
                 withSonarQubeEnv('sonarqube') {
                     sh "npx -y sonar-scanner -Dsonar.projectKey=${PROJECT_NAME} -Dsonar.sources=src -Dsonar.exclusions=node_modules/**,build/**"
                 }
@@ -66,7 +68,7 @@ pipeline {
             steps {
                 emailext subject: "Approval required: deploy ${PROJECT_NAME}",
                          to: "${DEVOPS_EMAIL}",
-                         body: "Quality Gate OK. Approve here: ${env.BUILD_URL}input"
+                         body: "Quality Gate Passed. Approve the deployment here: ${env.BUILD_URL}input"
                 
                 input message: "Deploy ${PROJECT_NAME} to production?", ok: "Deploy"
             }
@@ -75,11 +77,21 @@ pipeline {
         stage('Deploy') {
             steps {
                 sh '''
-                    echo "Deploying to ${DEPLOY_DIR}"
-                    sudo mkdir -p ${DEPLOY_DIR}
-                    sudo rm -rf ${DEPLOY_DIR}/*
-                    sudo cp -r build/* ${DEPLOY_DIR}/
+                    echo "Deploying build artifacts to ${DEPLOY_DIR}/build"
+                    
+                    # 1. Ensure the 'build' subdirectory exists
+                    sudo mkdir -p ${DEPLOY_DIR}/build
+                    
+                    # 2. Clear existing files inside the 'build' folder
+                    sudo rm -rf ${DEPLOY_DIR}/build/*
+                    
+                    # 3. Copy the fresh build INTO the 'build' folder
+                    sudo cp -r build/* ${DEPLOY_DIR}/build/
+                    
+                    # 4. Set permissions so Apache (www-data) can read them
                     sudo chown -R www-data:www-data ${DEPLOY_DIR}
+                    
+                    echo "Deployment to ${DEPLOY_DIR}/build successful."
                 '''
             }
         }
@@ -89,12 +101,12 @@ pipeline {
         success {
             emailext subject: "✅ Deployment SUCCESS: ${PROJECT_NAME}",
                      to: "${DEVOPS_EMAIL}",
-                     body: "Build successful: ${env.BUILD_URL}"
+                     body: "The pipeline finished successfully. Check your site at krish.run.place"
         }
         failure {
             emailext subject: "❌ Pipeline FAILED: ${PROJECT_NAME}",
                      to: "${DEVOPS_EMAIL}",
-                     body: "Build failed: ${env.BUILD_URL}"
+                     body: "The pipeline failed at stage: ${env.STAGE_NAME}. Check logs: ${env.BUILD_URL}"
         }
     }
 }
