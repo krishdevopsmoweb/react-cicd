@@ -179,7 +179,7 @@ class InvoiceForm extends React.Component {
               </Row>
               <hr className="my-4" />
               <Form.Label className="fw-bold">Notes:</Form.Label>
-              <Form.Control placeholder="Thanks for your business!" name="notes" value={this.state.notes} onChange={this.editField} as="textarea" className="my-2" rows={1} />
+              <Form.Control placeholder="Thanks for your business! with us" name="notes" value={this.state.notes} onChange={this.editField} as="textarea" className="my-2" rows={1} />
             </Card>
           </Col>
 
